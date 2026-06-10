@@ -1,0 +1,111 @@
+name: Import accepted submission
+
+on:
+  repository_dispatch:
+    types:
+      - accepted-head-submission
+  workflow_dispatch:
+    inputs:
+      submissions_repository:
+        description: "Submissions repository"
+        required: true
+        default: "SilentDevelopment/heads-submissions"
+      issue_number:
+        description: "Issue number to import"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+
+    env:
+      HEADS_REPOSITORY: SilentDevelopment/heads
+
+    steps:
+      - name: Resolve inputs
+        id: resolved
+        shell: bash
+        run: |
+          SUBMISSIONS_REPOSITORY="${{ github.event.client_payload.submissions_repository || github.event.inputs.submissions_repository }}"
+          ISSUE_NUMBER="${{ github.event.client_payload.issue_number || github.event.inputs.issue_number }}"
+
+          if [ -z "$SUBMISSIONS_REPOSITORY" ]; then
+            echo "Missing submissions repository."
+            exit 1
+          fi
+
+          if [ -z "$ISSUE_NUMBER" ]; then
+            echo "Missing issue number."
+            exit 1
+          fi
+
+          echo "submissions_repository=$SUBMISSIONS_REPOSITORY" >> "$GITHUB_OUTPUT"
+          echo "issue_number=$ISSUE_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout pipeline
+        uses: actions/checkout@v4
+        with:
+          path: heads-pipeline
+
+      - name: Checkout private heads repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.HEADS_REPOSITORY }}
+          path: heads
+          token: ${{ secrets.HEADS_WRITE_TOKEN }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+          cache-dependency-path: heads-pipeline/pom.xml
+
+      - name: Package pipeline
+        working-directory: heads-pipeline
+        run: mvn -pl heads-tool -am package
+
+      - name: Import issue into heads repo
+        working-directory: heads-pipeline
+        env:
+          GH_TOKEN: ${{ secrets.HEADS_WRITE_TOKEN }}
+          SUBMISSIONS_REPOSITORY: ${{ steps.resolved.outputs.submissions_repository }}
+          ISSUE_NUMBER: ${{ steps.resolved.outputs.issue_number }}
+        run: |
+          java -jar heads-tool/target/heads-tool-1.0.0.jar import-issue \
+            --source ../heads \
+            --repository "$SUBMISSIONS_REPOSITORY" \
+            --issue "$ISSUE_NUMBER"
+
+      - name: Validate changed heads source
+        working-directory: heads-pipeline
+        run: |
+          java -jar heads-tool/target/heads-tool-1.0.0.jar validate --source ../heads
+
+      - name: Create pull request
+        working-directory: heads
+        env:
+          GH_TOKEN: ${{ secrets.HEADS_WRITE_TOKEN }}
+          ISSUE_NUMBER: ${{ steps.resolved.outputs.issue_number }}
+        run: |
+          git config user.name "head-database-bot"
+          git config user.email "head-database-bot@users.noreply.github.com"
+
+          BRANCH="submission/issue-${ISSUE_NUMBER}"
+          git checkout -b "$BRANCH"
+
+          git add .
+          git commit -m "Import head submission #${ISSUE_NUMBER}"
+
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --repo "$HEADS_REPOSITORY" \
+            --base main \
+            --head "$BRANCH" \
+            --title "Import head submission #${ISSUE_NUMBER}" \
+            --body "Imports accepted submission from SilentDevelopment/heads-submissions#${ISSUE_NUMBER}."
