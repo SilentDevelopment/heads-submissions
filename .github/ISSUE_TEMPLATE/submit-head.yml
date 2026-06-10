@@ -1,0 +1,79 @@
+name: Submit head
+description: Submit a new head for the public Head Database catalog.
+title: "[Head]: "
+labels:
+  - submission
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Submit one head per issue.
+
+        By submitting this data, you agree that your contribution may be included in the Head Database dataset under CC0 1.0.
+
+  - type: input
+    id: name
+    attributes:
+      label: Head name
+      description: Display name for the head.
+      placeholder: "Blue Block"
+    validations:
+      required: true
+
+  - type: input
+    id: texture
+    attributes:
+      label: Texture hash
+      description: The textures.minecraft.net texture hash, not the full URL.
+      placeholder: "9636dee806ba47a2c40e95b57a12f37de6c2e677f2160132a07e24eeffa6"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: Pick the primary category.
+      options:
+        - alphabet
+        - animals
+        - blocks
+        - decoration
+        - emojis
+        - flags
+        - food-and-drinks
+        - humanoid
+        - humans
+        - icons
+        - logos
+        - miscellaneous
+        - monsters
+        - plants
+    validations:
+      required: true
+
+  - type: input
+    id: tags
+    attributes:
+      label: Tags
+      description: Comma-separated tag IDs. Use existing tags where possible.
+      placeholder: "fruit, summer"
+    validations:
+      required: false
+
+  - type: input
+    id: collections
+    attributes:
+      label: Manual collections
+      description: Optional comma-separated manual collection IDs. Leave empty unless a maintainer told you to use one.
+      placeholder: "featured"
+    validations:
+      required: false
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Optional context, source, correction notes, or explanation.
+    validations:
+      required: false
