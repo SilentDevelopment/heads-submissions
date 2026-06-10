@@ -15,6 +15,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Verify actor can accept submissions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          ROLE="$(gh api "repos/${REPOSITORY}/collaborators/${ACTOR}/permission" --jq '.role_name' 2>/dev/null || true)"
+
+          echo "Actor: ${ACTOR}"
+          echo "Repository role: ${ROLE}"
+
+          case "$ROLE" in
+            admin|maintain)
+              echo "Accepted by authorized actor."
+              ;;
+            *)
+              echo "::error::User ${ACTOR} is not allowed to accept submissions. Required role: write, maintain, or admin."
+              exit 1
+              ;;
+          esac
+
       - name: Dispatch import workflow
         env:
           GH_TOKEN: ${{ secrets.PIPELINE_DISPATCH_TOKEN }}
